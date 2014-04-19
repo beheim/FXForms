@@ -114,6 +114,8 @@ static inline NSArray *FXFormProperties(id<FXForm> form)
 {
     if (!form) return nil;
     
+    NSArray *ignoredFields = [form ignoredFields];
+    
     static void *FXFormPropertiesKey = &FXFormPropertiesKey;
     NSMutableArray *properties = objc_getAssociatedObject(form, FXFormPropertiesKey);
     if (!properties)
@@ -130,6 +132,10 @@ static inline NSArray *FXFormProperties(id<FXForm> form)
                 objc_property_t property = propertyList[i];
                 const char *propertyName = property_getName(property);
                 NSString *key = @(propertyName);
+                
+                if ([ignoredFields containsObject:key]) {
+                    continue;
+                }
                 
                 //get property type
                 Class valueClass = nil;
@@ -1104,6 +1110,11 @@ static BOOL *FXFormSetValueForKey(id<FXForm> form, id value, NSString *key)
 }
 
 - (NSArray *)extraFields
+{
+    return nil;
+}
+
+- (NSArray *)ignoredFields
 {
     return nil;
 }

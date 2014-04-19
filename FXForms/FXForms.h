@@ -88,6 +88,7 @@ static NSString *const FXFormFieldTypeImage = @"image";
 
 - (NSArray *)fields;
 - (NSArray *)extraFields;
+- (NSArray *)ignoredFields;
 
 // informal protocol:
 
