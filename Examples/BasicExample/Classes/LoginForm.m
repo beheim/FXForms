@@ -17,12 +17,20 @@
     return @{@"textLabel.color": [UIColor redColor]};
 }
 
+-(NSArray *)ignoredFields
+{
+    return @[@"numberOfLoginAttempts"];
+}
+
 //we're happy with the layout and properties of our login form, but we
 //want to add an additional button field at the end, so
 //we've used the extraFields method
 
 - (NSArray *)extraFields
 {
+    if (self.numberOfLoginAttempts > 0) {
+        return nil;
+    }
     return @[
              
              //this field doesn't correspond to any property of the form

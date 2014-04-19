@@ -16,4 +16,7 @@
 @property (nonatomic, copy) NSString *password;
 @property (nonatomic, assign) BOOL rememberMe;
 
+// ignoredFields
+@property (nonatomic, assign) NSUInteger numberOfLoginAttempts;
+
 @end

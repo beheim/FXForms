@@ -10,6 +10,9 @@
 #import "RegistrationForm.h"
 #import "RootForm.h"
 
+@interface RootFormViewController()
+@property (nonatomic, strong) RootForm *rootForm;
+@end
 
 @implementation RootFormViewController
 
@@ -18,7 +21,8 @@
     if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]))
     {
         //set up form
-        self.formController.form = [[RootForm alloc] init];
+        self.rootForm = [[RootForm alloc] init];
+        self.formController.form = self.rootForm;
     }
     return self;
 }
@@ -30,7 +34,17 @@
 - (void)submitLoginForm
 {
     //now we can display a form value in our alert
-    [[[UIAlertView alloc] initWithTitle:@"Login Form Submitted" message:nil delegate:nil cancelButtonTitle:nil otherButtonTitles:@"OK", nil] show];
+    [[[UIAlertView alloc] initWithTitle:@"Login Form Submitted" message:@"Hiding submit for 3 seconds." delegate:nil cancelButtonTitle:nil otherButtonTitles:@"OK", nil] show];
+    
+    
+    ((RootForm *)self.formController.form).login.numberOfLoginAttempts++;
+    // reload the form by hiding the submit button for 3 seconds
+    self.formController.form = self.rootForm;
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        ((RootForm *)self.formController.form).login.numberOfLoginAttempts = 0;
+        self.formController.form = self.rootForm;
+    });
 }
 
 - (void)submitRegistrationForm:(UITableViewCell<FXFormFieldCell> *)cell
