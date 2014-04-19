@@ -1242,6 +1242,7 @@ static BOOL *FXFormSetValueForKey(id<FXForm> form, id value, NSString *key)
 {
     _form = form;
     self.sections = [FXFormSection sectionsWithForm:form controller:self];
+    [self.tableView reloadData];
 }
 
 - (NSUInteger)numberOfSections
