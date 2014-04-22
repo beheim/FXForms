@@ -115,143 +115,138 @@ static inline NSArray *FXFormProperties(id<FXForm> form)
     if (!form) return nil;
     
     NSArray *ignoredFields = [form ignoredFields];
-    
-    static void *FXFormPropertiesKey = &FXFormPropertiesKey;
-    NSMutableArray *properties = objc_getAssociatedObject(form, FXFormPropertiesKey);
-    if (!properties)
+
+    NSMutableArray *properties = [NSMutableArray array];
+    Class subclass = [form class];
+    while (subclass != [NSObject class])
     {
-        properties = [NSMutableArray array];
-        Class subclass = [form class];
-        while (subclass != [NSObject class])
+        unsigned int propertyCount;
+        objc_property_t *propertyList = class_copyPropertyList(subclass, &propertyCount);
+        for (unsigned int i = 0; i < propertyCount; i++)
         {
-            unsigned int propertyCount;
-            objc_property_t *propertyList = class_copyPropertyList(subclass, &propertyCount);
-            for (unsigned int i = 0; i < propertyCount; i++)
+            //get property name
+            objc_property_t property = propertyList[i];
+            const char *propertyName = property_getName(property);
+            NSString *key = @(propertyName);
+            
+            if ([ignoredFields containsObject:key]) {
+                continue;
+            }
+            
+            //get property type
+            Class valueClass = nil;
+            NSString *valueType = nil;
+            char *typeEncoding = property_copyAttributeValue(property, "T");
+            switch (typeEncoding[0])
             {
-                //get property name
-                objc_property_t property = propertyList[i];
-                const char *propertyName = property_getName(property);
-                NSString *key = @(propertyName);
-                
-                if ([ignoredFields containsObject:key]) {
-                    continue;
-                }
-                
-                //get property type
-                Class valueClass = nil;
-                NSString *valueType = nil;
-                char *typeEncoding = property_copyAttributeValue(property, "T");
-                switch (typeEncoding[0])
+                case '@':
                 {
-                    case '@':
+                    if (strlen(typeEncoding) >= 3)
                     {
-                        if (strlen(typeEncoding) >= 3)
+                        char *className = strndup(typeEncoding + 2, strlen(typeEncoding) - 3);
+                        __autoreleasing NSString *name = @(className);
+                        NSRange range = [name rangeOfString:@"<"];
+                        if (range.location != NSNotFound)
                         {
-                            char *className = strndup(typeEncoding + 2, strlen(typeEncoding) - 3);
-                            __autoreleasing NSString *name = @(className);
-                            NSRange range = [name rangeOfString:@"<"];
-                            if (range.location != NSNotFound)
+                            name = [name substringToIndex:range.location];
+                        }
+                        valueClass = NSClassFromString(name) ?: [NSObject class];
+                        free(className);
+                        
+                        if ([valueClass isSubclassOfClass:[NSString class]])
+                        {
+                            NSString *lowercaseKey = [key lowercaseString];
+                            if ([lowercaseKey hasSuffix:@"password"])
                             {
-                                name = [name substringToIndex:range.location];
+                                valueType = FXFormFieldTypePassword;
                             }
-                            valueClass = NSClassFromString(name) ?: [NSObject class];
-                            free(className);
-                            
-                            if ([valueClass isSubclassOfClass:[NSString class]])
+                            else if ([lowercaseKey hasSuffix:@"email"])
                             {
-                                NSString *lowercaseKey = [key lowercaseString];
-                                if ([lowercaseKey hasSuffix:@"password"])
-                                {
-                                    valueType = FXFormFieldTypePassword;
-                                }
-                                else if ([lowercaseKey hasSuffix:@"email"])
-                                {
-                                    valueType = FXFormFieldTypeEmail;
-                                }
-                                else if ([lowercaseKey hasSuffix:@"url"] || [lowercaseKey hasSuffix:@"link"])
-                                {
-                                    valueType = FXFormFieldTypeURL;
-                                }
-                                else
-                                {
-                                    valueType = FXFormFieldTypeText;
-                                }
+                                valueType = FXFormFieldTypeEmail;
                             }
-                            else if ([valueClass isSubclassOfClass:[NSNumber class]])
+                            else if ([lowercaseKey hasSuffix:@"url"] || [lowercaseKey hasSuffix:@"link"])
                             {
-                                valueType = FXFormFieldTypeNumber;
-                            }
-                            else if ([valueClass isSubclassOfClass:[NSDate class]])
-                            {
-                                valueType = FXFormFieldTypeDate;
-                            }
-                            else if ([valueClass isSubclassOfClass:[UIImage class]])
-                            {
-                                valueType = FXFormFieldTypeImage;
+                                valueType = FXFormFieldTypeURL;
                             }
                             else
                             {
-                                valueType = FXFormFieldTypeDefault;
+                                valueType = FXFormFieldTypeText;
                             }
                         }
-                        break;
+                        else if ([valueClass isSubclassOfClass:[NSNumber class]])
+                        {
+                            valueType = FXFormFieldTypeNumber;
+                        }
+                        else if ([valueClass isSubclassOfClass:[NSDate class]])
+                        {
+                            valueType = FXFormFieldTypeDate;
+                        }
+                        else if ([valueClass isSubclassOfClass:[UIImage class]])
+                        {
+                            valueType = FXFormFieldTypeImage;
+                        }
+                        else
+                        {
+                            valueType = FXFormFieldTypeDefault;
+                        }
                     }
-                    case 'c':
-                    case 'B':
-                    {
-                        valueClass = [NSNumber class];
-                        valueType = FXFormFieldTypeBoolean;
-                        break;
-                    }
-                    case 'i':
-                    case 's':
-                    case 'l':
-                    case 'q':
-                    case 'C':
-                    case 'I':
-                    case 'S':
-                    case 'L':
-                    case 'Q':
-                    {
-                        valueClass = [NSNumber class];
-                        valueType = FXFormFieldTypeInteger;
-                        break;
-                    }
-                    case 'f':
-                    case 'd':
-                    {
-                        valueClass = [NSNumber class];
-                        valueType = FXFormFieldTypeFloat;
-                        break;
-                    }
-                    case '{': //struct
-                    case '(': //union
-                    {
-                        valueClass = [NSValue class];
-                        valueType = FXFormFieldTypeLabel;
-                        break;
-                    }
-                    case ':': //selector
-                    case '#': //class
-                    default:
-                    {
-                        valueClass = nil;
-                        valueType = nil;
-                    }
+                    break;
                 }
-                free(typeEncoding);
- 
-                //add to properties
-                if (valueClass && valueType)
+                case 'c':
+                case 'B':
                 {
-                    [properties addObject:@{FXFormFieldKey: key, FXFormFieldClass: valueClass, FXFormFieldType: valueType}];
+                    valueClass = [NSNumber class];
+                    valueType = FXFormFieldTypeBoolean;
+                    break;
+                }
+                case 'i':
+                case 's':
+                case 'l':
+                case 'q':
+                case 'C':
+                case 'I':
+                case 'S':
+                case 'L':
+                case 'Q':
+                {
+                    valueClass = [NSNumber class];
+                    valueType = FXFormFieldTypeInteger;
+                    break;
+                }
+                case 'f':
+                case 'd':
+                {
+                    valueClass = [NSNumber class];
+                    valueType = FXFormFieldTypeFloat;
+                    break;
+                }
+                case '{': //struct
+                case '(': //union
+                {
+                    valueClass = [NSValue class];
+                    valueType = FXFormFieldTypeLabel;
+                    break;
+                }
+                case ':': //selector
+                case '#': //class
+                default:
+                {
+                    valueClass = nil;
+                    valueType = nil;
                 }
             }
-            free(propertyList);
-            subclass = [subclass superclass];
+            free(typeEncoding);
+            
+            //add to properties
+            if (valueClass && valueType)
+            {
+                [properties addObject:@{FXFormFieldKey: key, FXFormFieldClass: valueClass, FXFormFieldType: valueType}];
+            }
         }
-        objc_setAssociatedObject(form, FXFormPropertiesKey, properties, OBJC_ASSOCIATION_RETAIN);
+        free(propertyList);
+        subclass = [subclass superclass];
     }
+    
     return properties;
 }
 
@@ -411,20 +406,28 @@ static BOOL *FXFormSetValueForKey(id<FXForm> form, id value, NSString *key)
 {
     //get fields
     NSMutableArray *fields = [[form fields] mutableCopy];
+    
+    // get form properties
+    NSArray *formProperties = FXFormProperties(form);
+    
     if (!fields)
     {
         //use default fields
-        fields = [NSMutableArray arrayWithArray:FXFormProperties(form)];
+        fields = [NSMutableArray arrayWithArray:formProperties];
     }
     
     //add extra fields
     [fields addObjectsFromArray:[form extraFields] ?: @[]];
     
+    NSArray *ignoredFields = [form ignoredFields];
+    
     //process fields
     NSMutableDictionary *fieldDictionariesByKey = [NSMutableDictionary dictionary];
-    for (NSDictionary *dict in FXFormProperties(form))
+    for (NSDictionary *dict in formProperties)
     {
-        fieldDictionariesByKey[dict[FXFormFieldKey]] = dict;
+        if (![ignoredFields containsObject:dict[FXFormFieldKey]]) {
+            fieldDictionariesByKey[dict[FXFormFieldKey]] = dict;
+        }
     }
     
     for (NSInteger i = [fields count] - 1; i >= 0; i--)
